@@ -3,11 +3,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_USER = os.environ["MYSQLUSER"]
-DATABASE_PASSWORD = os.environ["MYSQLPASSWORD"]
-DATABASE_HOST = os.environ["MYSQLHOST"]
+DATABASE_USER = os.environ.get("MYSQLUSER", "root")
+DATABASE_PASSWORD = os.environ.get("MYSQLPASSWORD", "chAVuwbfFRQeTppuvhpbMhkVGfkBqvqZ")
+DATABASE_HOST = os.environ.get("MYSQLHOST", "mysql.railway.internal")
 DATABASE_PORT = os.environ.get("MYSQLPORT", "3306")
-DATABASE_NAME = os.environ["MYSQLDATABASE"]
+DATABASE_NAME = os.environ.get("MYSQLDATABASE", "railway")
 
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
 
