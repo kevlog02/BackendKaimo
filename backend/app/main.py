@@ -106,6 +106,20 @@ def verify_email(verification: schemas.EmailVerification, db: Session = Depends(
     
     return {"message": "Email verificado exitosamente"}
 
+@app.get("/api/test-email")
+def test_email():
+    from .emailservice import send_email
+    try:
+        send_email(
+            email_to="kevinandresruro10@gmail.com",
+            subject="TEST KAIMO",
+            html_content="<h1>Funciona el correo </h1>"
+        )
+        return {"status": "sent"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 #USUARIOS
 
 @app.get("/api/users/me", response_model=schemas.UserResponse)
