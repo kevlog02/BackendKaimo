@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, Query
+from fastapi import FastAPI, Depends, HTTPException, status, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func, desc, and_
@@ -7,13 +7,14 @@ from typing import List, Optional
 from .gemini_service import gemini_service  
 from .database import engine, get_db
 from . import models, schemas, auth, email_service, services as app_services
-from .config import settings, is_production, get_cors_origins  
+from .config import settings, is_production
+import json
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="Kaimo API",
-    version="3.0.0",
+    version="4.0.0",
     docs_url="/docs" if not is_production() else None,
     redoc_url="/redoc" if not is_production() else None
 )
@@ -106,20 +107,6 @@ def verify_email(verification: schemas.EmailVerification, db: Session = Depends(
     
     return {"message": "Email verificado exitosamente"}
 
-@app.get("/api/test-email")
-def test_email():
-    from .emailservice import send_email
-    try:
-        send_email(
-            email_to="kevinandresruro10@gmail.com",
-            subject="TEST KAIMO",
-            html_content="<h1>Funciona el correo </h1>"
-        )
-        return {"status": "sent"}
-    except Exception as e:
-        return {"error": str(e)}
-
-
 #USUARIOS
 
 @app.get("/api/users/me", response_model=schemas.UserResponse)
@@ -138,14 +125,10 @@ async def update_user(
         current_user.full_name = user_update.full_name
     if user_update.location is not None:
         current_user.location = user_update.location
-    if user_update.phone is not None:
-        current_user.phone = user_update.phone
     if user_update.bio is not None:
         current_user.bio = user_update.bio
     if user_update.specialties is not None:
         current_user.specialties = user_update.specialties
-    if user_update.profile_image is not None:
-        current_user.profile_image = user_update.profile_image
     if user_update.role is not None:
         current_user.role = user_update.role
     
@@ -266,9 +249,10 @@ def get_pending_requests(
                 username=sender.username,
                 full_name=sender.full_name,
                 role=sender.role,
-                profile_image=sender.profile_image,
+
                 rating=sender.rating,
-                total_reviews=sender.total_reviews
+                total_reviews=sender.total_reviews,
+                bio=sender.bio
             ) if sender else None
         }
         result.append(request_dict)
@@ -382,94 +366,11 @@ def get_trust_network_graph(
                                 "target": technician.id,
                                 "type": "recommendation"
                             })
-    
     return {
         "nodes": nodes,
         "connections": connections,
         "center_user_id": current_user.id
     }
-    
-    """Obtener el grafo de red de confianza del usuario"""
-    nodes = []
-    connections = []
-    visited = set()
-    
-    def add_node(user: models.User, distance: int, is_friend: bool = False):
-        if user.id in visited:
-            return
-        visited.add(user.id)
-        
-        nodes.append({
-            "id": user.id,
-            "username": user.username,
-            "full_name": user.full_name,
-            "role": user.role,
-            "is_friend": is_friend,
-            "is_technician": user.role == "technician",
-            "distance": distance,
-            "rating": user.rating, 
-            "total_reviews": user.total_reviews  
-        })
-    
-    # Agregar nodo central (usuario actual)
-    add_node(current_user, 0, False)
-    
-    # Nivel 1: Amigos directos
-    friendships = db.query(models.friendship).filter(
-        or_(
-            models.friendship.c.user_id == current_user.id,
-            models.friendship.friend_id == current_user.id
-        ),
-        models.friendship.status == "accepted"
-    ).all()
-    
-    for friendship in friendships:
-        friend_id = friendship.friend_id if friendship.user_id == current_user.id else friendship.user_id
-        friend = db.query(models.User).filter(models.User.id == friend_id).first()
-        
-        if friend:
-            add_node(friend, 1, True)
-            connections.append({
-                "source": current_user.id,
-                "target": friend.id,
-                "type": "friendship"
-            })
-            
-            # Nivel 2: Técnicos recomendados (si max_depth >= 2)
-            if max_depth >= 2:
-                # Obtener servicios contratados por el amigo
-                services = db.query(models.Service).filter(
-                    models.Service.client_id == friend.id,
-                    models.Service.status == "completed"
-                ).all()
-                
-                for service in services:
-                    # Obtener reviews del técnico
-                    review = db.query(models.Review).filter(
-                        models.Review.service_id == service.id,
-                        models.Review.client_id == friend.id,
-                        models.Review.rating >= 4
-                    ).first()
-                    
-                    if review:
-                        technician = db.query(models.User).filter(
-                            models.User.id == service.technician_id
-                        ).first()
-                        
-                        if technician and technician.id != current_user.id:
-                            add_node(technician, 2, False)
-                            connections.append({
-                                "source": friend.id,
-                                "target": technician.id,
-                                "type": "recommendation"
-                            })
-    
-    return {
-        "nodes": nodes,
-        "connections": connections,
-        "center_user_id": current_user.id
-    }
-
 # SERVICIOS
 
 @app.post("/api/services", response_model=schemas.ServiceResponse, status_code=status.HTTP_201_CREATED)
@@ -492,18 +393,6 @@ def create_service(
     db.refresh(db_service)
     
     return db_service
-
-@app.get("/api/services/my-services", response_model=List[schemas.ServiceResponse])
-def get_my_services(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(auth.get_current_active_user)
-):
-    """Obtener servicios del técnico actual"""
-    services = db.query(models.Service).filter(
-        models.Service.technician_id == current_user.id
-    ).all()
-    
-    return services
 
 @app.get("/api/services/hired", response_model=List[schemas.ServiceResponse])
 def get_hired_services(
@@ -708,49 +597,79 @@ def get_favorites(
 
 #DASHBOARD
 
-@app.get("/api/dashboard/stats")
+@app.get("/api/dashboard/stats", response_model=schemas.DashboardResponse)
 def get_dashboard_stats(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
-    """Obtener estadísticas del dashboard"""
+    """Obtener estadísticas para el dashboard"""
+    
+    # Obtener mensajes no leídos
+    unread_messages = app_services.MessagingService.get_unread_messages_count(db, current_user.id)
+    
+    # Obtener actividad reciente (últimos 5 eventos)
+    # Por ahora simulamos actividad reciente basada en servicios y solicitudes
+    recent_activity = []
+    
+    # Servicios recientes
+    services = db.query(models.Service).filter(
+        or_(
+            models.Service.client_id == current_user.id,
+            models.Service.technician_id == current_user.id
+        )
+    ).order_by(models.Service.updated_at.desc()).limit(5).all()
+    
+    for service in services:
+        activity_type = "Servicio actualizado"
+        if service.status == "completed":
+            activity_type = "Servicio completado"
+        elif service.status == "in_progress":
+            activity_type = "Servicio en progreso"
+            
+        other_user = service.technician if service.client_id == current_user.id else service.client
+        
+        recent_activity.append({
+            "service": activity_type,
+            "client": other_user.full_name or other_user.username,
+            "time": service.updated_at.strftime("%d/%m/%Y")
+        })
+    
     if current_user.role == "client":
+        # Estadísticas de cliente
+        hired_services = db.query(models.Service).filter(
+            models.Service.client_id == current_user.id
+        ).count()
+        
+        friends_count = len(current_user.friends)
+        
+        # Favoritos (simulado por ahora si no hay tabla directa, o usar la relación si existe)
+        favorites_count = 0 # Implementar si existe tabla de favoritos
+        
         stats = schemas.ClientStats(
-            contacts=len(app_services.FriendshipService.get_friends(db, current_user.id)),
-            hired_services=db.query(models.Service).filter(
-                models.Service.client_id == current_user.id
-            ).count(),
-            friends=len(current_user.friends),
-            favorites=len(current_user.favorite_technicians)
+            contacts=friends_count, # Usamos amigos como contactos
+            hired_services=hired_services,
+            friends=friends_count,
+            favorites=favorites_count,
+            profile_views=current_user.profile_views,
+            unread_messages=unread_messages
         )
     else:
+        # Estadísticas de técnico
         stats = schemas.TechnicianStats(
             active_jobs=current_user.jobs_active,
             completed_jobs=current_user.jobs_completed,
             rating=current_user.rating,
-            total_reviews=current_user.total_reviews
+            total_reviews=current_user.total_reviews,
+            profile_views=current_user.profile_views,
+            unread_messages=unread_messages
         )
     
-    # Actividad reciente
-    recent_services = db.query(models.Service).filter(
-        (models.Service.client_id == current_user.id) |
-        (models.Service.technician_id == current_user.id)
-    ).order_by(models.Service.updated_at.desc()).limit(5).all()
-    
-    recent_activity = []
-    for service in recent_services:
-        recent_activity.append({
-            "service": service.title,
-            "status": service.status,
-            "date": service.updated_at.isoformat()
-        })
-    
-    return {
-        "user": current_user,
-        "stats": stats,
-        "recent_activity": recent_activity
-    }
-    
+    return schemas.DashboardResponse(
+        user=current_user,
+        stats=stats,
+        recent_activity=recent_activity
+    )
+
 @app.get("/api/technicians/{technician_id}/profile", response_model=schemas.TechnicianProfileResponse)
 def get_technician_profile(
     technician_id: int,
@@ -786,7 +705,7 @@ def get_technician_profile(
                     "email": client.email,
                     "full_name": client.full_name,
                     "role": client.role,
-                    "profile_image": client.profile_image,
+
                     "rating": client.rating,
                     "total_reviews": client.total_reviews
                 },
@@ -803,10 +722,10 @@ def get_technician_profile(
         "full_name": technician.full_name,
         "role": technician.role,
         "location": technician.location,
-        "phone": technician.phone,
+
         "bio": technician.bio,
         "specialties": technician.specialties,
-        "profile_image": technician.profile_image,
+
         "rating": technician.rating,
         "total_reviews": technician.total_reviews,
         "jobs_completed": technician.jobs_completed,
@@ -962,13 +881,13 @@ def get_pending_service_requests(
 @app.post("/api/services/{service_id}/accept")
 def accept_service_request(
     service_id: int,
-    price: float,
+    data: schemas.ServiceAccept,
     db: Session = Depends(get_db),
     current_user: models.User = Depends(auth.get_current_active_user)
 ):
     """Aceptar solicitud de servicio (técnico)"""
     service = app_services.ServiceRequestService.update_service_status(
-        db, service_id, current_user.id, "accepted", price
+        db, service_id, current_user.id, "accepted", data.price
     )
     
     if not service:
@@ -1044,6 +963,79 @@ def cancel_service(
     
     return {"message": "Servicio cancelado"}
 
+@app.get("/api/dashboard/stats", response_model=schemas.DashboardResponse)
+def get_dashboard_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Obtener estadísticas para el dashboard"""
+    
+    # Obtener mensajes no leídos
+    unread_messages = app_services.MessagingService.get_unread_messages_count(db, current_user.id)
+    
+    # Obtener actividad reciente (últimos 5 eventos)
+    # Por ahora simulamos actividad reciente basada en servicios y solicitudes
+    recent_activity = []
+    
+    # Servicios recientes
+    services = db.query(models.Service).filter(
+        or_(
+            models.Service.client_id == current_user.id,
+            models.Service.technician_id == current_user.id
+        )
+    ).order_by(models.Service.updated_at.desc()).limit(5).all()
+    
+    for service in services:
+        activity_type = "Servicio actualizado"
+        if service.status == "completed":
+            activity_type = "Servicio completado"
+        elif service.status == "in_progress":
+            activity_type = "Servicio en progreso"
+            
+        other_user = service.technician if service.client_id == current_user.id else service.client
+        
+        recent_activity.append({
+            "service": activity_type,
+            "client": other_user.full_name or other_user.username,
+            "time": service.updated_at.strftime("%d/%m/%Y")
+        })
+    
+    if current_user.role == "client":
+        # Estadísticas de cliente
+        hired_services = db.query(models.Service).filter(
+            models.Service.client_id == current_user.id
+        ).count()
+        
+        friends_count = len(current_user.friends)
+        
+        # Favoritos (simulado por ahora si no hay tabla directa, o usar la relación si existe)
+        favorites_count = 0 # Implementar si existe tabla de favoritos
+        
+        stats = schemas.ClientStats(
+            contacts=friends_count, # Usamos amigos como contactos
+            hired_services=hired_services,
+            friends=friends_count,
+            favorites=favorites_count,
+            profile_views=current_user.profile_views,
+            unread_messages=unread_messages
+        )
+    else:
+        # Estadísticas de técnico
+        stats = schemas.TechnicianStats(
+            active_jobs=current_user.jobs_active,
+            completed_jobs=current_user.jobs_completed,
+            rating=current_user.rating,
+            total_reviews=current_user.total_reviews,
+            profile_views=current_user.profile_views,
+            unread_messages=unread_messages
+        )
+    
+    return schemas.DashboardResponse(
+        user=current_user,
+        stats=stats,
+        recent_activity=recent_activity
+    )
+
 # ==================== GEMINI AI ENDPOINTS ====================
 
 @app.post("/api/ai/message-suggestions")
@@ -1077,6 +1069,33 @@ def improve_service_description(
     """Mejorar descripción de servicio con IA"""
     improved = gemini_service.generate_service_description(category, description)
     return {"improved_description": improved}
+
+@app.get("/api/ai/reviews-summary/{technician_id}")
+def get_reviews_summary(
+    technician_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Obtener resumen de opiniones de un técnico con IA"""
+    technician = db.query(models.User).filter(models.User.id == technician_id).first()
+    if not technician:
+        raise HTTPException(status_code=404, detail="Técnico no encontrado")
+        
+    reviews = db.query(models.Review).filter(models.Review.technician_id == technician_id).all()
+    review_texts = [r.comment for r in reviews if r.comment]
+    
+    summary = gemini_service.summarize_reviews(review_texts)
+    return {"summary": summary}
+
+@app.post("/api/ai/estimate-price")
+def estimate_service_price(
+    category: str = Body(...),
+    description: str = Body(...),
+    current_user: models.User = Depends(auth.get_current_active_user)
+):
+    """Estimar rango de precios con IA"""
+    estimation = gemini_service.estimate_price_range(category, description)
+    return {"estimation": estimation}
     
 @app.get("/")
 def root():

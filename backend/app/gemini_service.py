@@ -105,6 +105,59 @@ Devuelve SOLO la descripción mejorada en español, sin títulos ni formato adic
         except Exception as e:
             print(f"Error mejorando descripción: {e}")
             return brief_description
+
+    def summarize_reviews(self, reviews: List[str]) -> str:
+        """Resumir opiniones de un técnico"""
+        if not self.enabled or not reviews:
+            return "No hay suficientes opiniones para generar un resumen."
+            
+        reviews_text = "\n".join([f"- {r}" for r in reviews[:10]]) # Limit to 10 reviews
+        
+        prompt = f"""Analiza las siguientes opiniones sobre un técnico y genera un resumen conciso:
+
+{reviews_text}
+
+El resumen debe:
+- Destacar las fortalezas principales
+- Mencionar áreas de mejora si las hay
+- Ser breve (máximo 3-4 líneas)
+- Estar en español
+- Tono profesional y objetivo
+
+Devuelve SOLO el resumen.
+"""
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error resumiendo opiniones: {e}")
+            return "No se pudo generar el resumen de opiniones."
+
+    def estimate_price_range(self, category: str, description: str) -> str:
+        """Estimar rango de precios para un servicio"""
+        if not self.enabled:
+            return "Precio a convenir"
+            
+        prompt = f"""Estima un rango de precios razonable para el siguiente servicio en México (MXN):
+
+Categoría: {category}
+Descripción: {description}
+
+Considera:
+- Complejidad del trabajo
+- Materiales típicos (si aplica)
+- Tiempo estimado
+
+Devuelve SOLO el rango de precios estimado y una breve justificación (1 línea).
+Formato: "$MIN - $MAX MXN. Justificación."
+Ejemplo: "$500 - $800 MXN. Trabajo sencillo que requiere 1-2 horas."
+"""
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            print(f"Error estimando precio: {e}")
+            return "Precio a convenir"
     
     def _get_default_suggestions(self) -> List[str]:
         """Sugerencias por defecto cuando Gemini no está disponible"""

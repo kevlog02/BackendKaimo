@@ -7,23 +7,22 @@ CURRENT_ENV = os.getenv("ENV", os.getenv("RAILWAY_ENVIRONMENT", "development")).
 
 
 class Settings(BaseSettings):
-    database_url: str = os.getenv("DATABASE_URL", "")
+    database_url: str = os.getenv("DATABASE_URL", "mysql+pymysql://root:chAVuwbfFRQeTppuvhpbMhkVGfkBqvqZ@maglev.proxy.rlwy.net:29893/railway")
     secret_key: str = os.getenv("SECRET_KEY", "INSECURE_DEV_KEY")
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 30
 
-    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
-    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
-    SMTP_USER: str = os.getenv("SMTP_USER", "")
-    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
-
-    EMAILS_FROM_EMAIL: str = os.getenv("EMAILS_FROM_EMAIL", "")
-    EMAILS_FROM_NAME: str = os.getenv("EMAILS_FROM_NAME", "Kaimo")
+    email_host: str = "smtp.gmail.com"
+    email_port: int = 587
+    email_username: str = os.getenv("EMAIL_USERNAME", "")
+    email_password: str = os.getenv("EMAIL_PASSWORD", "")
+    emails_from_name: str = os.getenv("EMAILS_FROM_NAME", "Kaimo")
+    emails_from_email: str = os.getenv("EMAILS_FROM_EMAIL", "noreply@kaimo.com")
 
     gemini_api_key: Optional[str] = os.getenv("GEMINI_API_KEY")
 
-    frontend_url: str = os.getenv("FRONTEND_URL", "")
-    api_url: str = os.getenv("API_URL", "")
+    frontend_url: str = os.getenv("FRONTEND_URL", "https://kaimo.up.railway.app")
+    api_url: str = os.getenv("API_URL", "https://backendkaimo-production.up.railway.app")
 
     environment: str = CURRENT_ENV
     debug: bool = CURRENT_ENV != "production"
@@ -33,7 +32,6 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = False
         extra = "ignore"
-
 
 
 settings = Settings()

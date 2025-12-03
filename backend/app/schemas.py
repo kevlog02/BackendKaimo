@@ -14,29 +14,28 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     location: Optional[str] = None
-    phone: Optional[str] = None
     bio: Optional[str] = None
     specialties: Optional[str] = None
-    profile_image: Optional[str] = None
-    role: Optional[str] = None
 
+    role: Optional[str] = None
 class UserResponse(UserBase):
     id: int
-    full_name: Optional[str]
+    full_name: Optional[str] = None
     role: str
-    location: Optional[str]
-    phone: Optional[str]
-    bio: Optional[str]
-    specialties: Optional[str]
-    profile_image: Optional[str]
-    rating: float
-    total_reviews: int
-    jobs_completed: int
-    jobs_active: int
-    is_active: bool
-    is_verified: bool
-    created_at: datetime
-    
+    location: Optional[str] = None
+
+    bio: Optional[str] = None
+    specialties: Optional[str] = None
+
+
+    rating: Optional[float] = 0.0
+    total_reviews: Optional[int] = 0
+    jobs_completed: Optional[int] = 0
+    jobs_active: Optional[int] = 0
+    is_active: Optional[bool] = True
+    is_verified: Optional[bool] = False
+    created_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -46,9 +45,10 @@ class UserSummary(BaseModel):
     username: str
     full_name: Optional[str]
     role: str
-    profile_image: Optional[str]
+
     rating: float
     total_reviews: int
+    bio: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -99,9 +99,9 @@ class ServiceResponse(ServiceBase):
     title: str
     client_id: Optional[int]
     status: str
-    created_at: datetime
-    updated_at: datetime
-    completed_at: Optional[datetime]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     
     class Config:
         from_attributes = True
@@ -176,12 +176,16 @@ class ClientStats(BaseModel):
     hired_services: int
     friends: int
     favorites: int
+    profile_views: int
+    unread_messages: int
 
 class TechnicianStats(BaseModel):
     active_jobs: int
     completed_jobs: int
     rating: float
     total_reviews: int
+    profile_views: int
+    unread_messages: int
 
 class DashboardResponse(BaseModel):
     user: UserResponse
@@ -194,7 +198,7 @@ class UserSummaryWithEmail(BaseModel):
     email: str 
     full_name: Optional[str]
     role: str
-    profile_image: Optional[str]
+
     rating: float
     total_reviews: int
     
@@ -223,10 +227,10 @@ class TechnicianProfileResponse(BaseModel):
     full_name: Optional[str]
     role: str
     location: Optional[str]
-    phone: Optional[str]
+    
     bio: Optional[str]
     specialties: Optional[str]
-    profile_image: Optional[str]
+
     rating: float
     total_reviews: int
     jobs_completed: int
@@ -297,9 +301,12 @@ class ServiceUpdate(BaseModel):
     scheduled_date: Optional[datetime] = None
     price: Optional[float] = None
 
+class ServiceAccept(BaseModel):
+    price: float
+
 class ServiceResponse(BaseModel):
     id: int
-    client_id: int
+    client_id: Optional[int] = None
     technician_id: int
     category: str
     description: str
@@ -308,9 +315,9 @@ class ServiceResponse(BaseModel):
     completed_date: Optional[datetime]
     price: Optional[float]
     address: Optional[str]
-    created_at: datetime
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime]
-    client: UserSummary
+    client: Optional[UserSummary] = None
     technician: UserSummary
     
     class Config:

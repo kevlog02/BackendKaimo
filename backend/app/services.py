@@ -249,7 +249,7 @@ class RecommendationService:
                     username=technician.username,
                     full_name=technician.full_name,
                     role=technician.role,
-                    profile_image=technician.profile_image,
+
                     rating=technician.rating,
                     total_reviews=technician.total_reviews
                 ),
@@ -320,6 +320,17 @@ class MessagingService:
     @staticmethod
     def get_or_create_conversation(db: Session, client_id: int, technician_id: int):
         """Obtener o crear una conversación entre cliente y técnico"""
+        # Verificar que el técnico existe
+        technician = db.query(models.User).filter(
+            models.User.id == technician_id,
+            models.User.role == "technician"
+        ).first()
+        
+        if not technician:
+            # Si no es técnico, verificar si es cliente (para casos de prueba o flexibilidad)
+            # Pero idealmente solo se crean con técnicos
+            pass
+
         # Buscar conversación existente
         conversation = db.query(models.Conversation).filter(
             or_(
@@ -488,6 +499,26 @@ class MessagingService:
         
         return True
     
+    @staticmethod
+    def get_unread_messages_count(db: Session, user_id: int) -> int:
+        """Obtener total de mensajes no leídos"""
+        conversations = db.query(models.Conversation).filter(
+            or_(
+                models.Conversation.client_id == user_id,
+                models.Conversation.technician_id == user_id
+            ),
+            models.Conversation.is_active == True
+        ).all()
+        
+        total_unread = 0
+        for conv in conversations:
+            if user_id == conv.client_id:
+                total_unread += conv.unread_client
+            else:
+                total_unread += conv.unread_technician
+        
+        return total_unread
+    
 class ServiceRequestService:
     """Servicio para gestionar solicitudes de servicio"""
     
@@ -528,3 +559,50 @@ class ServiceRequestService:
             print(f"Error en create_service_request: {e}")
             db.rollback()
             raise e
+
+    @staticmethod
+    def get_user_services(db: Session, user_id: int, role: str):
+        """Obtener servicios del usuario"""
+        if role == "client":
+            return db.query(models.Service).filter(
+                models.Service.client_id == user_id
+            ).order_by(models.Service.created_at.desc()).all()
+        else:
+            return db.query(models.Service).filter(
+                models.Service.technician_id == user_id
+            ).order_by(models.Service.created_at.desc()).all()
+
+    @staticmethod
+    def get_pending_requests(db: Session, technician_id: int):
+        """Obtener solicitudes pendientes para un técnico"""
+        return db.query(models.Service).filter(
+            models.Service.technician_id == technician_id,
+            models.Service.status == "pending"
+        ).order_by(models.Service.created_at.desc()).all()
+
+    @staticmethod
+    def update_service_status(db: Session, service_id: int, user_id: int, status: str, price: float = None):
+        """Actualizar estado del servicio"""
+        service = db.query(models.Service).filter(
+            models.Service.id == service_id
+        ).first()
+        
+        if not service:
+            return None
+            
+        # Verificar permisos (el usuario debe ser parte del servicio)
+        if service.client_id != user_id and service.technician_id != user_id:
+            return None
+            
+        service.status = status
+        service.updated_at = func.now()
+        
+        if status == "accepted" and price is not None:
+            service.price = price
+            
+        if status == "completed":
+            service.completed_at = func.now()
+            
+        db.commit()
+        db.refresh(service)
+        return service

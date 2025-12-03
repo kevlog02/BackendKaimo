@@ -36,16 +36,17 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     role = Column(String(50), default="client")  # 'client' o 'technician'
     location = Column(String(255), nullable=True)
-    phone = Column(String(20), nullable=True)
+
     bio = Column(Text, nullable=True)
-    specialties = Column(Text, nullable=True)  # JSON string
-    profile_image = Column(String(500), nullable=True)
+    specialties = Column(Text, nullable=True)  
+
     
     # Estadísticas
     rating = Column(Float, default=0.0)
     total_reviews = Column(Integer, default=0)
     jobs_completed = Column(Integer, default=0)
     jobs_active = Column(Integer, default=0)
+    profile_views = Column(Integer, default=0)
     
     is_active = Column(Boolean, default=False)
     is_verified = Column(Boolean, default=False)
