@@ -11,7 +11,7 @@ load_dotenv()
 DATABASE_USER = os.environ.get("MYSQLUSER", "root")
 DATABASE_PASSWORD = os.environ.get("MYSQLPASSWORD", "chAVuwbfFRQeTppuvhpbMhkVGfkBqvqZ")
 DATABASE_HOST = os.environ.get("MYSQLHOST", "mysql.railway.internal")
-DATABASE_PORT = os.environ.get("MYSQLPORT", "29893")
+DATABASE_PORT = os.environ.get("MYSQLPORT", 29893)
 DATABASE_NAME = os.environ.get("MYSQLDATABASE", "railway")
 
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
