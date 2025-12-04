@@ -20,7 +20,7 @@ CONFIG = {
         "debug": False,
         "docs_enabled": False,
     },
-    "current": "development" 
+    "current": "production" 
 }
 
 def get_config():
