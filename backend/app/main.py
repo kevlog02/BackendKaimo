@@ -30,6 +30,10 @@ app.add_middleware(
 
 #AUTENTIFICACION
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "environment": "production" if is_production() else "development"}
+
 @app.post("/api/register", response_model=schemas.UserResponse, status_code=status.HTTP_201_CREATED)
 def register(user: schemas.UserCreate, db: Session = Depends(get_db)):
     """Registrar un nuevo usuario"""
