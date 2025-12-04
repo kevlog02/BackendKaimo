@@ -8,6 +8,7 @@ from .gemini_service import gemini_service
 from .database import engine, get_db
 from . import models, schemas, auth, email_service, services as app_services
 from .config import settings, is_production
+from app.config import get_cors_origins
 import json
 
 models.Base.metadata.create_all(bind=engine)
