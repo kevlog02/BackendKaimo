@@ -4,17 +4,24 @@ from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
 
-# Cargar variables de entorno
 load_dotenv()
 
-# Construir URL desde variables de entorno
-DATABASE_USER = os.environ.get("MYSQLUSER", "root")
-DATABASE_PASSWORD = os.environ.get("MYSQLPASSWORD", "chAVuwbfFRQeTppuvhpbMhkVGfkBqvqZ")
-DATABASE_HOST = os.environ.get("MYSQLHOST", "mysql.railway.internal")
-DATABASE_PORT = os.environ.get("MYSQLPORT", 29893)
-DATABASE_NAME = os.environ.get("MYSQLDATABASE", "railway")
+raw_url = os.environ.get("DATABASE_URL")
 
-SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+if raw_url:
+    SQLALCHEMY_DATABASE_URL = raw_url.replace("mysql://", "mysql+pymysql://")
+else:
+    # Modo local
+    DATABASE_USER = os.environ.get("MYSQLUSER", "root")
+    DATABASE_PASSWORD = os.environ.get("MYSQLPASSWORD", "")
+    DATABASE_HOST = os.environ.get("MYSQLHOST", "maglev.proxy.rlwy.net")
+    DATABASE_PORT = int(os.environ.get("MYSQLPORT", 3306))
+    DATABASE_NAME = os.environ.get("MYSQLDATABASE", "railway")
+
+    SQLALCHEMY_DATABASE_URL = (
+        f"mysql+pymysql://{DATABASE_USER}:{DATABASE_PASSWORD}@"
+        f"{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    )
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
